@@ -1,0 +1,1 @@
+benchmarks are run via python -m benchmark_package.main

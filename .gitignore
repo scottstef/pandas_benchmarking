@@ -1,0 +1,11 @@
+*.csv
+*.json
+*.png
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+.vscode/
+*.db
