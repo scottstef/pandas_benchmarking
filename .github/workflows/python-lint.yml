@@ -128,7 +128,7 @@ jobs:
             fi
   
   # Create a README.md section with updated badges
-  cat > .github/badges/README_BADGES.md << EOL
+            cat > .github/badges/README_BADGES.md << EOL
 ![Pylint Score](https://img.shields.io/badge/pylint-${PYLINT_SCORE}%2F10-${PYLINT_COLOR})
 ![Flake8 Issues](https://img.shields.io/badge/flake8-${FLAKE8_ISSUES}%20issues-${FLAKE8_COLOR})
 EOL
