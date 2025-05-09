@@ -180,7 +180,7 @@ jobs:
           # Run isort to fix imports
           isort .
           
-          # Commit changes if any were made
+          # Commit changes if any were made by scott
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
           git add .
