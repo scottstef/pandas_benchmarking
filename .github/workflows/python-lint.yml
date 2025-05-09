@@ -9,8 +9,15 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    # Add permissions for GITHUB_TOKEN to allow commit/push
+    permissions:
+      contents: write
+    
     steps:
       - uses: actions/checkout@v3
+        with:
+          # Fetch all history for proper committing
+          fetch-depth: 0
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -93,7 +100,6 @@ jobs:
           PYLINT_SCORE="${{ steps.pylint.outputs.score }}" 
           FLAKE8_ISSUES="${{ steps.flake8.outputs.issues }}"
         
-       
           # Default values if outputs are empty
           if [ -z "$PYLINT_SCORE" ]; then
               PYLINT_SCORE="0.00"
@@ -146,19 +152,6 @@ jobs:
             exit 1
           fi
 
-      # Commit the badges
-      - name: Commit Badges
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git status # Add this line to see git status
-          git add .github/badges/ 
-          git status # Add this line to see git status after add
-          git commit -m "Update code quality badges [skip ci]" 
-          git push 
-        continue-on-error: true
-      
       # Also run black and isort
       - name: Check with black
         run: |
@@ -184,76 +177,28 @@ jobs:
           isort .
           echo "isort finished fixing imports"
 
-          
-          # Commit changes if any were made by scott it worked!
-          git status
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Bot"
-          git add .
-          echo "After git add"
-          git status
-          git commit -m "Auto-fix formatting issues [skip ci]" || echo "No changes to commit"
-      
-      - name: Push changes
-        env:
-          GH_PAT: ${{ secrets.GITHUB_TOKEN }}
+      # Commit and push changes if needed
+      - name: Commit and Push Changes
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
-          git remote set-url origin https://x-access-token:${GH_PAT}@Perfect — since you'll be reusing the token for packaging and other repo tasks, keeping the broader scopes is reasonable. Here's exactly what you need to do:
-
----
-
-### ✅ Step 1: Add the Token as a Secret
-
-Go to your repo settings:
-
-> **Repo → Settings → Secrets and variables → Actions → New repository secret**
-
-* **Name**: `GH_PAT`
-* **Value**: Paste the full token you mentioned
-
----
-
-### ✅ Step 2: Update Your GitHub Actions Workflow
-
-Here’s a full example to drop into `.github/workflows/autoformat.yml` or similar:
-
-```yaml
-name: Auto Format
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  auto-format:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-
-    - name: Install formatter
-      run: pip install black
-
-    - name: Run black
-      run: black . --line-length=88
-
-    - name: Commit changes if needed
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add .
-        git diff --cached --quiet || git commit -m "Auto-fix formatting issues [skip ci]"
-
-    - name: Push changes
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        git remote set-url origin https://x-access-token:${GH_PAT}@github.com/scottstef/pandas_benchmarking.git
-        git push
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add badge files
+          git add .github/badges/
+          
+          # Commit badge changes if any
+          git diff --cached --quiet || git commit -m "Update code quality badges [skip ci]"
+          
+          # Add all files (for formatting changes)
+          git add .
+          
+          # Commit formatting changes if any
+          git diff --cached --quiet || git commit -m "Auto-fix formatting issues [skip ci]"
+          
+          # Set remote with token
+          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
+          
+          # Push changes
+          git push
         continue-on-error: true
