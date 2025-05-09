@@ -26,7 +26,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc
       
-      # Run flake8 and count issues using Python instead of shell
+      # Run flake8 and count issues using Python
       - name: Run Flake8 and Count Issues
         id: flake8
         run: |
@@ -35,6 +35,7 @@ jobs:
           python -c "
           import subprocess
           import sys
+          import os
           
           result = subprocess.run(['flake8', '.', '--count', '--statistics'], 
                                  capture_output=True, text=True)
@@ -65,9 +66,9 @@ jobs:
           import os
           import re
           
-          # Run pylint with reports enabled
-          result = subprocess.run(['pylint', '--rcfile=pylintrc', '--reports=y'] + 
-                                  subprocess.check_output(['git', 'ls-files', '*.py']).decode().strip().split('\\n'), 
+          # Run pylint with reports enabled - split command to handle shell expansion safely
+          files = subprocess.check_output(['git', 'ls-files', '*.py']).decode().strip().split('\n')
+          result = subprocess.run(['pylint', '--rcfile=pylintrc', '--reports=y'] + files, 
                                   capture_output=True, text=True)
           
           print(result.stdout)
