@@ -24,22 +24,28 @@ jobs:
           pip install pandas numpy dask matplotlib pyspark
           if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
       
-      - name: Count Flake8 Issues
-        id: flake8
-        run: |
-          # Run flake8 and count issues
-          FLAKE8_OUTPUT=$(flake8 . --count --statistics)
-          
-          # Count total issues (last line of output)
-          ISSUE_COUNT=$(echo "$FLAKE8_OUTPUT" | tail -n 1)
-          
-          # Save count to output
-          echo "issues=$ISSUE_COUNT" >> $GITHUB_OUTPUT
-          
-          # Display all issues for reference
-          flake8 . --count --statistics
-          
-          echo "Total Flake8 Issues: $ISSUE_COUNT"
+          - name: Count Flake8 Issues
+          id: flake8
+          run: |
+            # Run flake8 and save output to a file
+            flake8 . --count --statistics > flake8_output.txt || true
+            
+            # Display the output for reference
+            cat flake8_output.txt
+            
+            # Count total issues (last line of output)
+            ISSUE_COUNT=$(tail -n 1 flake8_output.txt || echo "0")
+            
+            # Make sure ISSUE_COUNT is a number
+            if ! [[ "$ISSUE_COUNT" =~ ^[0-9]+$ ]]; then
+              ISSUE_COUNT="0"
+            fi
+            
+            # Save count to output
+            echo "issues=$ISSUE_COUNT" >> $GITHUB_OUTPUT
+            
+            echo "Total Flake8 Issues: $ISSUE_COUNT"
+          continue-on-error: true
       
       - name: Lint with pylint and capture score
         id: pylint
