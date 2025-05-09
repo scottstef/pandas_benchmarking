@@ -157,3 +157,21 @@ jobs:
         run: |
           isort --check-only --profile black --diff . || echo "isort found issues but continuing"
         continue-on-error: true
+        
+      # ADD THIS STEP - Auto-fix formatting issues
+      - name: Auto-fix formatting issues
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          # Run black to fix formatting
+          black .
+          
+          # Run isort to fix imports
+          isort .
+          
+          # Commit changes if any were made
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add .
+          git commit -m "Auto-fix formatting issues [skip ci]" || echo "No changes to commit"
+          git push || echo "Failed to push changes"
+        continue-on-error: true
