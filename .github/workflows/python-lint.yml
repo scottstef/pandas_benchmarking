@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          # Fetch all history for generating score history
-          fetch-depth: 0
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -27,29 +24,46 @@ jobs:
           pip install pandas numpy dask matplotlib pyspark
           if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
       
-      - name: Lint with flake8
+      - name: Count Flake8 Issues
+        id: flake8
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+          # Run flake8 and count issues
+          FLAKE8_OUTPUT=$(flake8 . --count --statistics)
+          
+          # Count total issues (last line of output)
+          ISSUE_COUNT=$(echo "$FLAKE8_OUTPUT" | tail -n 1)
+          
+          # Save count to output
+          echo "issues=$ISSUE_COUNT" >> $GITHUB_OUTPUT
+          
+          # Display all issues for reference
+          flake8 . --count --statistics
+          
+          echo "Total Flake8 Issues: $ISSUE_COUNT"
       
-          - name: Lint with pylint and capture score
-          id: pylint
-          run: |
-            # Run pylint and save output
-            pylint --rcfile=pylintrc $(git ls-files '*.py') > pylint_output.txt 2>&1 || true
-            
-            # Alternative extraction using awk
-            PYLINT_SCORE=$(awk '/Your code has been rated at/ {print $7}' pylint_output.txt | cut -d'/' -f1 || echo "0.00")
-            
-            # Save score to output
-            echo "score=$PYLINT_SCORE" >> $GITHUB_OUTPUT
-            
-            echo "Pylint Score: $PYLINT_SCORE"
+      - name: Lint with pylint and capture score
+        id: pylint
+        run: |
+          # Run pylint with reports enabled to ensure we get the score
+          # Use tee to capture output to file while displaying it
+          pylint --rcfile=pylintrc --reports=y $(git ls-files '*.py') | tee pylint_output.txt || true
+          
+          # Extract score using grep with a more flexible pattern
+          PYLINT_SCORE=$(grep -o "Your code has been rated at [0-9]\+\.[0-9]\+/10" pylint_output.txt | grep -o "[0-9]\+\.[0-9]\+" || echo "0.00")
+          
+          # Save score to output
+          echo "score=$PYLINT_SCORE" >> $GITHUB_OUTPUT
+          
+          echo "Pylint Score: $PYLINT_SCORE"
       
-      - name: Create Pylint Badge
+      - name: Create Code Quality Badge
         if: always() && steps.pylint.outputs.score != ''
         run: |
           SCORE="${{ steps.pylint.outputs.score }}"
+          ISSUES="${{ steps.flake8.outputs.issues }}"
+          
+          # Create directory for badges
+          mkdir -p .github/badges
           
           # Determine badge color based on score
           if (( $(echo "$SCORE < 5.0" | bc -l) )); then
@@ -62,42 +76,172 @@ jobs:
             COLOR="green"
           fi
           
-          # Create badge markdown
-          echo "[![Pylint Score](https://img.shields.io/badge/pylint-${SCORE}%2F10-${COLOR})](https://github.com/${{ github.repository }}/actions)" > pylint-badge.md
+          # Create pylint badge markdown
+          echo "[![Pylint Score](https://img.shields.io/badge/pylint-${SCORE}%2F10-${COLOR})](https://github.com/${{ github.repository }}/actions)" > .github/badges/pylint-badge.md
           
-          mkdir -p .github/badges
-          cp pylint-badge.md .github/badges/
+          # Determine color for flake8 issues
+          if (( ISSUES > 100 )); then
+            FLAKE_COLOR="red"
+          elif (( ISSUES > 50 )); then
+            FLAKE_COLOR="orange"
+          elif (( ISSUES > 10 )); then
+            FLAKE_COLOR="yellow"
+          else
+            FLAKE_COLOR="green"
+          fi
+          
+          # Create flake8 badge markdown
+          echo "[![Flake8 Issues](https://img.shields.io/badge/flake8-${ISSUES}%20issues-${FLAKE_COLOR})](https://github.com/${{ github.repository }}/actions)" > .github/badges/flake8-badge.md
       
-      - name: Commit Badge
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.pylint.outputs.score != ''
+      - name: Commit Badges
+        if: always() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && steps.pylint.outputs.score != ''
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add .github/badges/pylint-badge.md
-          git commit -m "Update pylint badge [skip ci]" || echo "No changes to commit"
+          git add .github/badges/
+          git commit -m "Update code quality badges [skip ci]" || echo "No changes to commit"
           git push || echo "Failed to push changes"
       
-      - name: Save Score History
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.pylint.outputs.score != ''
+      - name: Save Code Quality History
+        if: always() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && steps.pylint.outputs.score != ''
         run: |
           SCORE="${{ steps.pylint.outputs.score }}"
+          ISSUES="${{ steps.flake8.outputs.issues }}"
           DATE=$(date +"%Y-%m-%d")
           
-          mkdir -p .github/pylint-history
+          mkdir -p .github/code-quality-history
           
           # Create CSV file if it doesn't exist
-          if [ ! -f .github/pylint-history/scores.csv ]; then
-            echo "date,score" > .github/pylint-history/scores.csv
+          if [ ! -f .github/code-quality-history/metrics.csv ]; then
+            echo "date,pylint_score,flake8_issues" > .github/code-quality-history/metrics.csv
           fi
           
-          # Append new score
-          echo "$DATE,$SCORE" >> .github/pylint-history/scores.csv
+          # Append new metrics
+          echo "$DATE,$SCORE,$ISSUES" >> .github/code-quality-history/metrics.csv
+          
+          # Create simple HTML report
+          cat > .github/code-quality-history/index.html << EOL
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Code Quality History</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+              body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+              .chart-container { height: 400px; margin-bottom: 30px; }
+              h1 { color: #333; }
+            </style>
+          </head>
+          <body>
+            <h1>Code Quality History for ${{ github.repository }}</h1>
+            
+            <div class="chart-container">
+              <canvas id="pylintChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+              <canvas id="flake8Chart"></canvas>
+            </div>
+            
+            <script>
+              fetch('metrics.csv')
+                .then(response => response.text())
+                .then(data => {
+                  const rows = data.trim().split('\\n').slice(1); // Skip header
+                  const dates = [];
+                  const pylintScores = [];
+                  const flake8Issues = [];
+                  
+                  rows.forEach(row => {
+                    const [date, score, issues] = row.split(',');
+                    dates.push(date);
+                    pylintScores.push(parseFloat(score));
+                    flake8Issues.push(parseInt(issues));
+                  });
+                  
+                  // Pylint Chart
+                  const pylintCtx = document.getElementById('pylintChart').getContext('2d');
+                  new Chart(pylintCtx, {
+                    type: 'line',
+                    data: {
+                      labels: dates,
+                      datasets: [{
+                        label: 'Pylint Score (higher is better)',
+                        data: pylintScores,
+                        borderColor: 'blue',
+                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                        fill: true,
+                        tension: 0.1
+                      }]
+                    },
+                    options: {
+                      scales: {
+                        y: {
+                          min: 0,
+                          max: 10,
+                          title: {
+                            display: true,
+                            text: 'Score (out of 10)'
+                          }
+                        },
+                        x: {
+                          title: {
+                            display: true,
+                            text: 'Date'
+                          }
+                        }
+                      },
+                      responsive: true,
+                      maintainAspectRatio: false
+                    }
+                  });
+                  
+                  // Flake8 Chart
+                  const flake8Ctx = document.getElementById('flake8Chart').getContext('2d');
+                  new Chart(flake8Ctx, {
+                    type: 'line',
+                    data: {
+                      labels: dates,
+                      datasets: [{
+                        label: 'Flake8 Issues (lower is better)',
+                        data: flake8Issues,
+                        borderColor: 'red',
+                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                        fill: true,
+                        tension: 0.1
+                      }]
+                    },
+                    options: {
+                      scales: {
+                        y: {
+                          min: 0,
+                          title: {
+                            display: true,
+                            text: 'Number of Issues'
+                          }
+                        },
+                        x: {
+                          title: {
+                            display: true,
+                            text: 'Date'
+                          }
+                        }
+                      },
+                      responsive: true,
+                      maintainAspectRatio: false
+                    }
+                  });
+                });
+            </script>
+          </body>
+          </html>
+          EOL
           
           # Commit changes
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add .github/pylint-history/scores.csv
-          git commit -m "Update pylint score history [skip ci]" || echo "No changes to commit"
+          git add .github/code-quality-history/
+          git commit -m "Update code quality history [skip ci]" || echo "No changes to commit"
           git push || echo "Failed to push changes"
       
       - name: Check formatting with black
