@@ -1,0 +1,8 @@
+[MASTER]
+disable=
+    C0111, # missing docstrings
+    R0903, # too few public methods
+    C0103  # invalid variable name
+
+[FORMAT]
+max-line-length=100

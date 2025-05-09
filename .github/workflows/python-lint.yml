@@ -1,0 +1,189 @@
+name: Python Code Quality
+
+on:
+  push:
+    branches: ['*']
+  pull_request: 
+    branches: ['*']
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black pylint isort
+          pip install pandas numpy dask matplotlib pyspark
+          # Install additional required packages
+          sudo apt-get update
+          sudo apt-get install -y bc
+      
+      # Run flake8 and count issues using Python
+      - name: Run Flake8 and Count Issues
+        id: flake8
+        run: |
+          # Use Python to count flake8 issues
+          echo "Checking code with flake8..."
+          python -c "
+          import subprocess
+          import sys
+          import os
+          
+          result = subprocess.run(['flake8', '.', '--count', '--statistics'], 
+                                 capture_output=True, text=True)
+          
+          print(result.stdout)
+          
+          # Extract the last line which contains the total count
+          lines = result.stdout.strip().split('\n')
+          count = '0'
+          if lines and lines[-1].isdigit():
+              count = lines[-1]
+              
+          # Write to GitHub output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'issues={count}\\n')
+              
+          print(f'Flake8 found {count} issues')
+          "
+      
+      # Run pylint and extract score using Python
+      - name: Run Pylint and Get Score
+        id: pylint
+        run: |
+          # Use Python to extract pylint score
+          echo "Checking code with pylint..."
+          python -c "
+          import subprocess
+          import os
+          import re
+          
+          # Run pylint with reports enabled - split command to handle shell expansion safely
+          files = subprocess.check_output(['git', 'ls-files', '*.py']).decode().strip().split('\n')
+          result = subprocess.run(['pylint', '--rcfile=pylintrc', '--reports=y'] + files, 
+                                  capture_output=True, text=True)
+          
+          print(result.stdout)
+          
+          # Extract the score using regex
+          score = '0.00'
+          match = re.search(r'Your code has been rated at ([0-9.]+)/10', result.stdout)
+          if match:
+              score = match.group(1)
+              
+          # Write to GitHub output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'score={score}\\n')
+              
+          print(f'Pylint score: {score}/10')
+          "
+      
+      # Create badge for the code quality results
+      - name: Create Code Quality Badges
+        run: |
+          # Get the scores from the previous steps
+          PYLINT_SCORE="${{ steps.pylint.outputs.score }}" 
+          FLAKE8_ISSUES="${{ steps.flake8.outputs.issues }}"
+        
+       
+          # Default values if outputs are empty
+          if [ -z "$PYLINT_SCORE" ]; then
+              PYLINT_SCORE="0.00"
+          fi
+          
+          if [ -z "$FLAKE8_ISSUES" ]; then
+              FLAKE8_ISSUES="0"
+          fi
+          
+          # Determine badge color for pylint
+          if (( $(echo "$PYLINT_SCORE < 5.0" | bc -l) )); then
+              PYLINT_COLOR="red"
+          elif (( $(echo "$PYLINT_SCORE < 7.0" | bc -l) )); then
+              PYLINT_COLOR="orange"
+          elif (( $(echo "$PYLINT_SCORE < 9.0" | bc -l) )); then
+              PYLINT_COLOR="yellow"
+          else
+              PYLINT_COLOR="green"
+          fi
+          
+          # Determine color for flake8 issues
+          if (( FLAKE8_ISSUES > 100 )); then
+              FLAKE8_COLOR="red"
+          elif (( FLAKE8_ISSUES > 50 )); then
+              FLAKE8_COLOR="orange"
+          elif (( FLAKE8_ISSUES > 10 )); then
+              FLAKE8_COLOR="yellow"
+          else
+              FLAKE8_COLOR="green"
+          fi
+          
+          # Create directory for badges
+          mkdir -p .github/badges
+          
+          # Check if directory was created
+          if [ ! -d ".github/badges" ]; then
+            echo "Error: .github/badges directory was not created!"
+            exit 1
+          fi
+          
+          # Create a README.md section with updated badges
+          cat > .github/badges/README_BADGES.md << EOL
+          ![Pylint Score](https://img.shields.io/badge/pylint-${PYLINT_SCORE}%2F10-${PYLINT_COLOR})
+          ![Flake8 Issues](https://img.shields.io/badge/flake8-${FLAKE8_ISSUES}%20issues-${FLAKE8_COLOR})
+          EOL
+          
+          # Check if the file was created
+          if [ ! -f ".github/badges/README_BADGES.md" ]; then
+            echo "Error: .github/badges/README_BADGES.md file was not created!"
+            exit 1
+          fi
+
+      # Commit the badges
+      - name: Commit Badges
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git status # Add this line to see git status
+          git add .github/badges/ 
+          git status # Add this line to see git status after add
+          git commit -m "Update code quality badges [skip ci]" 
+          git push 
+        continue-on-error: true
+      
+      # Also run black and isort
+      - name: Check with black
+        run: |
+          black --check --diff . || echo "Black found formatting issues but continuing"
+        continue-on-error: true
+      
+      - name: Check with isort
+        run: |
+          isort --check-only --profile black --diff . || echo "isort found issues but continuing"
+        continue-on-error: true
+        
+      # Auto-fix formatting issues
+      - name: Auto-fix formatting issues
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          # Run black to fix formatting
+          black .
+          
+          # Run isort to fix imports
+          isort .
+          
+          # Commit changes if any were made by scott
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add .
+          git commit -m "Auto-fix formatting issues [skip ci]" || echo "No changes to commit"
+          git push || echo "Failed to push changes"
+        continue-on-error: true
