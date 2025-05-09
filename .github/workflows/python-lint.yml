@@ -41,7 +41,3 @@ jobs:
             - name: Check import order with isort
               run: |
                 isort --check-only --profile black --diff .
-
-
-
-]
