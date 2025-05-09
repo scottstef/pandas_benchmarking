@@ -1,17 +1,19 @@
+import csv
 import os
-import time
-import sqlite3
-from datetime import datetime
 import random
-import pandas as pd
-import numpy as np
+import sqlite3
+import time
+from datetime import datetime
+
 import dask.dataframe as dd
 import matplotlib.pyplot as plt
-import csv
+import numpy as np
+import pandas as pd
 
-csv_path = 'fake_data.csv'
-db_path = 'benchmark_results.db'
+csv_path = "fake_data.csv"
+db_path = "benchmark_results.db"
 benchmark_results = []
+
 
 # Function to generate data
 def generate_data(count, num_cols):
@@ -20,18 +22,19 @@ def generate_data(count, num_cols):
 
     print("\nGenerating fake data with pandas...")
     data = np.random.rand(NUM_ROWS, NUM_COLS)
-    columns = [f'col_{i}' for i in range(NUM_COLS)]
+    columns = [f"col_{i}" for i in range(NUM_COLS)]
     df = pd.DataFrame(data, columns=columns)
 
     # Save to CSV using Pandas
-    print('Starting to write file')
+    print("Starting to write file")
     df.to_csv(csv_path, index=False)
-    print('Done writing to file')
+    print("Done writing to file")
 
     file_stats = os.stat(csv_path)
     file_size_mb = file_stats.st_size / (1024 * 1024)  # File size in MB
-    print(f'File Size in MegaBytes is {file_size_mb:.2f}')
-    return file_size_mb  
+    print(f"File Size in MegaBytes is {file_size_mb:.2f}")
+    return file_size_mb
+
 
 # Benchmark using Pandas
 def pandas_benchmark():
@@ -39,16 +42,17 @@ def pandas_benchmark():
     start = time.time()
 
     df_pandas = pd.read_csv(csv_path)
-    result_pandas = df_pandas.groupby('col_0').mean()
+    result_pandas = df_pandas.groupby("col_0").mean()
 
     end = time.time()
     pandas_time = end - start
     print(f"Pandas time: {pandas_time:.2f} seconds")
-    benchmark_results.append(('Pandas', pandas_time))
+    benchmark_results.append(("Pandas", pandas_time))
 
     del df_pandas
     del result_pandas
     return pandas_time
+
 
 # Benchmark using Dask
 def dask_benchmark():
@@ -56,16 +60,17 @@ def dask_benchmark():
     start = time.time()
 
     df_dask = dd.read_csv(csv_path)
-    result_dask = df_dask.groupby('col_0').mean().compute()
+    result_dask = df_dask.groupby("col_0").mean().compute()
 
     end = time.time()
     dask_time = end - start
     print(f"Dask time: {dask_time:.2f} seconds")
-    benchmark_results.append(('Dask', dask_time))
+    benchmark_results.append(("Dask", dask_time))
 
     del df_dask
     del result_dask
     return dask_time
+
 
 # Native Python Benchmark (mean calculation with native Python)
 def native_python_benchmark():
@@ -73,11 +78,13 @@ def native_python_benchmark():
     start = time.time()
 
     # Read the CSV file using Python's built-in csv module
-    with open(csv_path, 'r') as f:
+    with open(csv_path, "r") as f:
         reader = csv.reader(f)
         headers = next(reader)  # Skip header row
         col_0 = [float(row[0]) for row in reader]
-        col_1 = [float(row[1]) for row in reader]  # Assuming another column for the mean calculation
+        col_1 = [
+            float(row[1]) for row in reader
+        ]  # Assuming another column for the mean calculation
 
     # Group by col_0 and calculate the mean for col_1 (simulating groupby in pandas/dask)
     grouped_data = {}
@@ -92,7 +99,7 @@ def native_python_benchmark():
     end = time.time()
     native_python_time = end - start
     print(f"Native Python time: {native_python_time:.2f} seconds")
-    benchmark_results.append(('Native Python', native_python_time))
+    benchmark_results.append(("Native Python", native_python_time))
 
     return native_python_time
 
@@ -101,7 +108,8 @@ def native_python_benchmark():
 def initialize_database():
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute('''
+    c.execute(
+        """
         CREATE TABLE IF NOT EXISTS benchmarks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             run_date TEXT,
@@ -112,20 +120,28 @@ def initialize_database():
             dask_time REAL,
             native_python_time REAL
         )
-    ''')
+    """
+    )
     conn.commit()
     conn.close()
 
+
 # Save benchmark results into the database
-def save_results(run_date, count, num_cols, file_size_mb, pandas_time, dask_time, native_python_time):
+def save_results(
+    run_date, count, num_cols, file_size_mb, pandas_time, dask_time, native_python_time
+):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute('''
+    c.execute(
+        """
         INSERT INTO benchmarks (run_date, count, num_cols, file_size_mb, pandas_time, dask_time, native_python_time)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (run_date, count, num_cols, file_size_mb, pandas_time, dask_time, native_python_time))
+    """,
+        (run_date, count, num_cols, file_size_mb, pandas_time, dask_time, native_python_time),
+    )
     conn.commit()
     conn.close()
+
 
 # Plot the benchmark results
 def plot_benchmarks():
@@ -137,33 +153,64 @@ def plot_benchmarks():
     conn.close()
 
     plt.figure(figsize=(14, 8))
-    plt.plot(df['run_date'], df['pandas_time'], label='Pandas', marker='o')
-    plt.plot(df['run_date'], df['dask_time'], label='Dask', marker='o')
-    plt.plot(df['run_date'], df['native_python_time'], label='Native Python', marker='o')
+    plt.plot(df["run_date"], df["pandas_time"], label="Pandas", marker="o")
+    plt.plot(df["run_date"], df["dask_time"], label="Dask", marker="o")
+    plt.plot(df["run_date"], df["native_python_time"], label="Native Python", marker="o")
 
     for i, row in df.iterrows():
         annotation = f"{row['count']}M, {row['num_cols']} cols"
-        plt.annotate(annotation, (row['run_date'], row['pandas_time']),
-                     textcoords="offset points", xytext=(0,10), ha='center', fontsize=8, color='green')
-        plt.annotate(annotation, (row['run_date'], row['dask_time']),
-                     textcoords="offset points", xytext=(0,-15), ha='center', fontsize=8, color='blue')
-        plt.annotate(annotation, (row['run_date'], row['native_python_time']),
-                     textcoords="offset points", xytext=(0,-30), ha='center', fontsize=8, color='red')
+        plt.annotate(
+            annotation,
+            (row["run_date"], row["pandas_time"]),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            fontsize=8,
+            color="green",
+        )
+        plt.annotate(
+            annotation,
+            (row["run_date"], row["dask_time"]),
+            textcoords="offset points",
+            xytext=(0, -15),
+            ha="center",
+            fontsize=8,
+            color="blue",
+        )
+        plt.annotate(
+            annotation,
+            (row["run_date"], row["native_python_time"]),
+            textcoords="offset points",
+            xytext=(0, -30),
+            ha="center",
+            fontsize=8,
+            color="red",
+        )
 
-    plt.xlabel('Run Date')
-    plt.ylabel('Time (seconds)')
+    plt.xlabel("Run Date")
+    plt.ylabel("Time (seconds)")
 
-    last_run = df['run_date'].max()
+    last_run = df["run_date"].max()
     total_runs = len(df)
-    plt.title(f'Benchmark Performance Over Time\n{total_runs} Runs • Last Test: {last_run}', fontsize=16)
+    plt.title(
+        f"Benchmark Performance Over Time\n{total_runs} Runs • Last Test: {last_run}", fontsize=16
+    )
 
     plt.xticks(rotation=45)
     plt.grid(True)
     plt.legend()
 
     timestamp_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    plt.text(1.0, -0.15, f"Plot generated: {timestamp_now}",
-             ha='right', va='center', transform=plt.gca().transAxes, fontsize=8, color='gray')
+    plt.text(
+        1.0,
+        -0.15,
+        f"Plot generated: {timestamp_now}",
+        ha="right",
+        va="center",
+        transform=plt.gca().transAxes,
+        fontsize=8,
+        color="gray",
+    )
 
     plt.tight_layout()
     plt.savefig(plot_file_name, dpi=300)
@@ -171,12 +218,13 @@ def plot_benchmarks():
 
     plt.show(block=False)
 
+
 # Main function
 def main():
     initialize_database()
 
     seed_value = int(time.time())  # Using current time as a dynamic seed for randomness
-    random.seed(seed_value)        # Seed the random module
+    random.seed(seed_value)  # Seed the random module
     np.random.seed(seed_value)
 
     for i in range(2):  # Run 20 tests
@@ -199,10 +247,13 @@ def main():
         native_python_time = native_python_benchmark()
 
         run_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        save_results(run_date, count, num_cols, file_size_mb, pandas_time, dask_time, native_python_time)
+        save_results(
+            run_date, count, num_cols, file_size_mb, pandas_time, dask_time, native_python_time
+        )
 
     # After all runs, plot the results
     plot_benchmarks()
+
 
 if __name__ == "__main__":
     main()

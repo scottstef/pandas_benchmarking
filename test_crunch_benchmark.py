@@ -2,28 +2,42 @@
 
 import os
 import sqlite3
+
 import pandas as pd
 import pytest
-from crunch_benchmark import generate_data, pandas_benchmark, dask_benchmark, initialize_database, save_results, db_path, csv_path
+
+from crunch_benchmark import (
+    csv_path,
+    dask_benchmark,
+    db_path,
+    generate_data,
+    initialize_database,
+    pandas_benchmark,
+    save_results,
+)
+
 
 def setup_module(module):
-    """ Setup: Run once before all tests """
+    """Setup: Run once before all tests"""
     if os.path.exists(db_path):
         os.remove(db_path)
     if os.path.exists(csv_path):
         os.remove(csv_path)
 
+
 def teardown_module(module):
-    """ Teardown: Clean up after tests """
+    """Teardown: Clean up after tests"""
     if os.path.exists(db_path):
         os.remove(db_path)
     if os.path.exists(csv_path):
         os.remove(csv_path)
+
 
 def test_generate_data():
     size = generate_data(1, 5)  # 1 million rows, 5 columns
     assert size > 0
     assert os.path.exists(csv_path)
+
 
 def test_initialize_database():
     initialize_database()
@@ -35,6 +49,7 @@ def test_initialize_database():
     table = c.fetchone()
     conn.close()
     assert table is not None
+
 
 def test_save_results():
     initialize_database()
@@ -52,13 +67,15 @@ def test_save_results():
     conn.close()
 
     assert len(df) == 1
-    assert df.iloc[0]['file_size_mb'] == file_size_mb
+    assert df.iloc[0]["file_size_mb"] == file_size_mb
     assert len(df) == 1
+
 
 def test_pandas_benchmark():
     generate_data(1, 5)
     time_taken = pandas_benchmark()
     assert time_taken > 0
+
 
 def test_dask_benchmark():
     generate_data(1, 5)
