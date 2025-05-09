@@ -174,17 +174,23 @@ jobs:
       - name: Auto-fix formatting issues
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
+          echo "Auto-fixing formatting issues..."
           # Run black to fix formatting
           black .
+          echo "Black finished formatting"
           
+          echo "Running isort to fix imports..."
           # Run isort to fix imports
           isort .
+          echo "isort finished fixing imports"
+
           
           # Commit changes if any were made by scott
           git status
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
           git add .
+          echo "After git add"
           git status
           git commit -m "Auto-fix formatting issues [skip ci]" || echo "No changes to commit"
           git push || echo "Failed to push changes"
