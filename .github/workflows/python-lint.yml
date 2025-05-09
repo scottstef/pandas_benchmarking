@@ -90,12 +90,9 @@ jobs:
       - name: Create Code Quality Badges
         run: |
         # Get the scores from the previous steps
-        PYLINT_SCORE="${{ steps.pylint.outputs.score }}"
-        FLAKE8_ISSUES="${{ steps.flake8.outputs.issues }}"
+        PYLINT_SCORE="${{ steps.pylint.outputs.score }}" FLAKE8_ISSUES="${{ steps.flake8.outputs.issues }}"
         
-        echo "Pylint Score: $PYLINT_SCORE"
-        echo "Flake8 Issues: $FLAKE8_ISSUES"
-        
+       
         # Default values if outputs are empty
         if [ -z "$PYLINT_SCORE" ]; then
             PYLINT_SCORE="0.00"
