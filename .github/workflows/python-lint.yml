@@ -89,49 +89,50 @@ jobs:
       # Create badge for the code quality results
       - name: Create Code Quality Badges
         run: |
-        # Get the scores from the previous steps
-        PYLINT_SCORE="${{ steps.pylint.outputs.score }}" FLAKE8_ISSUES="${{ steps.flake8.outputs.issues }}"
+          # Get the scores from the previous steps
+          PYLINT_SCORE="${{ steps.pylint.outputs.score }}" 
+          FLAKE8_ISSUES="${{ steps.flake8.outputs.issues }}"
         
        
-        # Default values if outputs are empty
-        if [ -z "$PYLINT_SCORE" ]; then
-            PYLINT_SCORE="0.00"
-        fi
-        
-        if [ -z "$FLAKE8_ISSUES" ]; then
-            FLAKE8_ISSUES="0"
-        fi
-        
-        # Determine badge color for pylint
-        if (( $(echo "$PYLINT_SCORE < 5.0" | bc -l) )); then
-            PYLINT_COLOR="red"
-        elif (( $(echo "$PYLINT_SCORE < 7.0" | bc -l) )); then
-            PYLINT_COLOR="orange"
-        elif (( $(echo "$PYLINT_SCORE < 9.0" | bc -l) )); then
-            PYLINT_COLOR="yellow"
-        else
-            PYLINT_COLOR="green"
-        fi
-        
-        # Determine color for flake8 issues
-        if (( FLAKE8_ISSUES > 100 )); then
-            FLAKE8_COLOR="red"
-        elif (( FLAKE8_ISSUES > 50 )); then
-            FLAKE8_COLOR="orange"
-        elif (( FLAKE8_ISSUES > 10 )); then
-            FLAKE8_COLOR="yellow"
-        else
-            FLAKE8_COLOR="green"
-        fi
-        
-        # Create directory for badges
-        mkdir -p .github/badges
-        
-        # Create a README.md section with updated badges
-        cat > .github/badges/README_BADGES.md << EOL
-        ![Pylint Score](https://img.shields.io/badge/pylint-${PYLINT_SCORE}%2F10-${PYLINT_COLOR})
-        ![Flake8 Issues](https://img.shields.io/badge/flake8-${FLAKE8_ISSUES}%20issues-${FLAKE8_COLOR})
-        EOL
+          # Default values if outputs are empty
+          if [ -z "$PYLINT_SCORE" ]; then
+              PYLINT_SCORE="0.00"
+          fi
+          
+          if [ -z "$FLAKE8_ISSUES" ]; then
+              FLAKE8_ISSUES="0"
+          fi
+          
+          # Determine badge color for pylint
+          if (( $(echo "$PYLINT_SCORE < 5.0" | bc -l) )); then
+              PYLINT_COLOR="red"
+          elif (( $(echo "$PYLINT_SCORE < 7.0" | bc -l) )); then
+              PYLINT_COLOR="orange"
+          elif (( $(echo "$PYLINT_SCORE < 9.0" | bc -l) )); then
+              PYLINT_COLOR="yellow"
+          else
+              PYLINT_COLOR="green"
+          fi
+          
+          # Determine color for flake8 issues
+          if (( FLAKE8_ISSUES > 100 )); then
+              FLAKE8_COLOR="red"
+          elif (( FLAKE8_ISSUES > 50 )); then
+              FLAKE8_COLOR="orange"
+          elif (( FLAKE8_ISSUES > 10 )); then
+              FLAKE8_COLOR="yellow"
+          else
+              FLAKE8_COLOR="green"
+          fi
+          
+          # Create directory for badges
+          mkdir -p .github/badges
+          
+          # Create a README.md section with updated badges
+          cat > .github/badges/README_BADGES.md << EOL
+          ![Pylint Score](https://img.shields.io/badge/pylint-${PYLINT_SCORE}%2F10-${PYLINT_COLOR})
+          ![Flake8 Issues](https://img.shields.io/badge/flake8-${FLAKE8_ISSUES}%20issues-${FLAKE8_COLOR})
+          EOL
       # Commit the badges
       - name: Commit Badges
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
