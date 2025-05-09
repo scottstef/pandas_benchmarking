@@ -128,20 +128,35 @@ jobs:
           # Create directory for badges
           mkdir -p .github/badges
           
+          # Check if directory was created
+          if [ ! -d ".github/badges" ]; then
+            echo "Error: .github/badges directory was not created!"
+            exit 1
+          fi
+          
           # Create a README.md section with updated badges
           cat > .github/badges/README_BADGES.md << EOL
           ![Pylint Score](https://img.shields.io/badge/pylint-${PYLINT_SCORE}%2F10-${PYLINT_COLOR})
           ![Flake8 Issues](https://img.shields.io/badge/flake8-${FLAKE8_ISSUES}%20issues-${FLAKE8_COLOR})
           EOL
+          
+          # Check if the file was created
+          if [ ! -f ".github/badges/README_BADGES.md" ]; then
+            echo "Error: .github/badges/README_BADGES.md file was not created!"
+            exit 1
+          fi
+
       # Commit the badges
       - name: Commit Badges
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add .github/badges/ || true
-          git commit -m "Update code quality badges [skip ci]" || echo "No changes to commit"
-          git push || echo "Failed to push changes"
+          git status # Add this line to see git status
+          git add .github/badges/ 
+          git status # Add this line to see git status after add
+          git commit -m "Update code quality badges [skip ci]" 
+          git push 
         continue-on-error: true
       
       # Also run black and isort
